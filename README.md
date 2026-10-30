@@ -6,7 +6,6 @@ Version 1.0.0. TMO estimates standard errors using auxiliary outcomes to measure
 
 Run in Stata:
 
-    ssc install gtools
     net install tmo, from("https://raw.githubusercontent.com/wjnkim/tmo/main/src") replace
     help tmo
 
@@ -44,8 +43,6 @@ Automatic selection uses the grid 0.1, 0.15, ..., 1 and, as in the paper, keeps 
 - src/tmo.jar: optional compiled Java kernel.
 - src/tmo.pkg and src/stata.toc: Stata installation files.
 - src/tmo.java and src/build.ps1: kernel source and Windows PowerShell build recipe.
-- LICENSE: MIT License.
-- scpc_tmo/: the SCPC companion, with its own MIT License in scpc_tmo/LICENSE.
 
 The source build is optional for users. See src/README.md for build and test instructions.
 
