@@ -1,11 +1,16 @@
-v 0.9.0b1
-d 'tmo': Threshold Multiple Outcomes (TMO) standard error estimator
+v 1.0.0
+d 'tmo': Thresholding Multiple Outcomes (TMO) standard error estimator
 d 
 d Requires: 
 d - Stata version 13
 d - gtools package (ssc install gtools)
+d - Java (optional; the estimator falls back to Mata without it)
+d - geodist for legacy distance dyads only (ssc install geodist)
+d - compatible SCPC companion for scpc options only (see help tmo)
 d
-d Distribution Date: 2025-04-08
+d Distribution-Date: 20261029
+d
+d License: MIT (see LICENSE in the repository)
 d
 d Author: Woojin Kim
 d
@@ -13,3 +18,4 @@ d Support: email wjnkim@stanford.edu
 d
 F tmo.ado
 F tmo.sthlp
+F tmo.jar

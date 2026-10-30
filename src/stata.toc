@@ -1,4 +1,4 @@
-v 0.9.0b1
+v 1.0.0
 d Woojin Kim
 d wjnkim@stanford.edu
 
