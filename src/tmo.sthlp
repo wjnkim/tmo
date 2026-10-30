@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 1.0.0 2026-10-29}{...}
+{* *! version 1.0.0 2026-10-30}{...}
 {title:Title}
 
 {pstd}
@@ -175,7 +175,7 @@ educated with state fixed effects{p_end}
 {synopt:{cmd:r(orig_se)}} original standard error from {cmd:cmd()}{p_end}
 {synopt:{cmd:r(lb)}} lower bound of 95% confidence interval{p_end}
 {synopt:{cmd:r(ub)}} upper bound of 95% confidence interval{p_end}
-{synopt:{cmd:r(threshold)}} selected threshold ({it:delta} in the output){p_end}
+{synopt:{cmd:r(threshold)}} selected threshold{p_end}
 {synopt:{cmd:r(pct_ge_thres)}} percentage of off-diagonal location pairs kept,
 including protected pairs {p_end}
 {synopt:{cmd:r(pct_ge_thres_nocl)}} percentage of eligible pairs kept {p_end}

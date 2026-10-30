@@ -1,4 +1,4 @@
-*! version 1.0.0 2026-10-29
+*! version 1.0.0 2026-10-30
 * Threshold selection maximizes the target variance minus the auxiliary-outcome penalty.
 
 * Any helpers-only reload must skip this block: tmo, tmo_work and
@@ -1463,63 +1463,6 @@ program define tmo_scpc_backend
 end
 }
 
-if "`1'"=="__tmo_scpc_backend_helpers_only" {
-capture mata: mata drop tmo_scpc_backend_ready()
-capture mata: mata drop set_Wx_cluster()
-mata:
-real scalar tmo_scpc_backend_ready()
-{
-    external real scalar __tmo_scpc_backend_patch
-    return(__tmo_scpc_backend_patch==1)
-}
-
-void set_Wx_cluster(string scalar Vname, string scalar sel)
-{
-    external real scalar condflag
-    external real matrix Wfin, Wx
-    external real vector permfin
-    real vector r
-    real scalar i
-    string scalar cluster
-
-    cluster=st_global("e(clustvar)")
-    if(cluster=="" | cols(tokens(cluster))!=1) {
-        errprintf("tmo: conditional SCPC requires the current single cluster variable.\n")
-        _error(459)
-    }
-    condflag=1
-    r=J(rows(Wfin),1,0)
-    Wx=Wfin
-    for(i=1;i<=cols(Wfin);i++) {
-        r[permfin]=Wfin[.,i]
-        stata("capture drop scpc_r")
-        stata("quietly generate scpc_r=.")
-        stata("quietly replace scpc_r=0 if e(sample)")
-        st_store(.,"scpc_r",sel,r)
-        stata("capture drop scpc_rx")
-        stata("quietly gegen scpc_rx=total(scpc_r) if e(sample), by("+cluster+")")
-        stata("capture drop scpc_r")
-        if(i==1) {
-            stata("quietly generate scpc_r=scpc_rx*scpc_xs if e(sample)")
-        }
-        else {
-            stata("quietly replace scpc_rx=scpc_rx*scpc_xs")
-            stata("_estimates hold oreg, restore")
-            stata(Vname)
-            stata("quietly predict scpc_r, residuals")
-            stata("_estimates unhold oreg")
-        }
-        stata("capture drop scpc_rx")
-        stata("quietly hashsort "+cluster)
-        stata("quietly gegen scpc_rx=total(scpc_r*scpc_x) if e(sample), by("+cluster+")")
-        Wx[.,i]=st_data(.,"scpc_rx",sel)[permfin]
-    }
-    set_ccspc()
-}
-__tmo_scpc_backend_patch=1
-end
-}
-
 
 if "`1'"!="__tmo_scpc_auto_helpers_only" {
 capture program drop tmo_scpc_auto
@@ -2319,21 +2262,32 @@ program define tmo_selection_output, rclass
     }
     clear
     ereturn clear
-    di as txt _n "TMO standard error for `xname': " as res %12.7g scalar(__tmo_s_tmo_se)
-    di as txt "  eta = " as res %8.5g scalar(__tmo_s_sel_eta) as txt ", delta = " as res %9.5g scalar(__tmo_s_sel_thres) ///
-        as txt ", selected index = " as res %4.0f scalar(__tmo_s_sel_index)
-    di as txt "  effective null dimension = " as res %10.5g 1/scalar(__tmo_s_sel_v0) ///
-        as txt "; regression df_r = " as res %10.5g scalar(__tmo_s_df_r)
-    di as txt "  finite-sample factor n/(n-k) = " as res %10.7g scalar(__tmo_s_dof_adj) ///
-        as txt "; k = " as res %8.0f scalar(__tmo_s_finite_k)
-    di as txt "  `kernel' kernel; pilot from `pilotsource'; retained outcomes = " as res scalar(__tmo_nout)
-    di as txt "  protected off-diagonal pairs (cluster/distance) = " as res %8.3f ///
-        100*scalar(__tmo_s_sel_nprotected)/(scalar(__tmo_s_N)*(scalar(__tmo_s_N)-1)/2) as txt "% of all off-diagonal pairs"
+    tempname tmo_results
+    mat `tmo_results' = J(1,6,.)
+    mat rownames `tmo_results' = "`xname'"
+    mat colnames `tmo_results' = "Coef" "TMO SE" "t" "P>|t|" "95% Conf" "Interval"
+    if missing(scalar(__tmo_s_df_r)) mat colnames `tmo_results' = "Coef" "TMO SE" "z" "P>|z|" "95% Conf" "Interval"
+    mat `tmo_results'[1,1] = scalar(__tmo_s_beta)
+    mat `tmo_results'[1,2] = scalar(__tmo_s_tmo_se)
+    mat `tmo_results'[1,3] = scalar(__tmo_s_beta)/scalar(__tmo_s_tmo_se)
+    if missing(scalar(__tmo_s_df_r)) {
+        mat `tmo_results'[1,4] = 2*normal(-abs(scalar(__tmo_s_beta)/scalar(__tmo_s_tmo_se)))
+    }
+    else {
+        mat `tmo_results'[1,4] = 2*ttail(scalar(__tmo_s_df_r),abs(scalar(__tmo_s_beta)/scalar(__tmo_s_tmo_se)))
+    }
+    mat `tmo_results'[1,5] = scalar(__tmo_s_lb)
+    mat `tmo_results'[1,6] = scalar(__tmo_s_ub)
+    di as txt _n "TMO standard errors for `xname'"
+    matlist `tmo_results', border(all) cspec(o2& %16s | %9.3f o1 & %9.3f o1 & %6.2f o1 & %4.3f o1 & %9.3f o1 & %9.3f o1 &) rspec(&-&)
     if `pairwork' {
-        di as txt "  additionally kept by threshold = " as res %8.3f ///
-            100*scalar(__tmo_screened)/(scalar(__tmo_s_N)*(scalar(__tmo_s_N)-1)/2) as txt "% of all off-diagonal pairs"
-        di as txt "  total kept = " as res %8.3f 100*scalar(__tmo_s_offdP) ///
-            as txt "%; threshold pass rate among eligible pairs = " as res %8.3f 100*scalar(__tmo_s_offdPnocl) as txt "%"
+        di as txt "  Threshold = " as res %5.3f scalar(__tmo_s_sel_thres) ///
+            as txt "; pairs kept = " as res %5.2f 100*scalar(__tmo_s_offdP) ///
+            as txt "%; outcomes = " as res scalar(__tmo_nout)
+    }
+    else {
+        di as txt "  Threshold = " as res %5.3f scalar(__tmo_s_sel_thres) ///
+            as txt "; outcomes = " as res scalar(__tmo_nout)
     }
     if scalar(__tmo_s_tmo_scpc_se)<. {
         di as txt "  Separate comparisons: SCPC SE = " as res %12.7g scalar(__tmo_s_scpc_se) ///
@@ -3583,7 +3537,7 @@ program define tmo_estimate, rclass
     if "`libpath'"!="" {
         capture confirm file "`libpath'/tmo.jar"
         if !_rc {
-            adopath ++ "`libpath'"
+            quietly adopath ++ "`libpath'"
             capture javacall tmo.tmo run, jars(tmo.jar)
             if !_rc local kern "java"
             if __tmo_java_memory_failure==1 {
@@ -4670,4 +4624,62 @@ void tmo_select(real scalar usejava)
     st_matrix("__tmo_anchorstats",stats)
     st_matrix("__tmo_objectivepath",obj)
 }
+end
+
+* The SCPC runtime patch loads only when tmo_scpc_backend reloads this file.
+* Other loads stop here, so Stata has no Mata block to skip.
+if "`1'"!="__tmo_scpc_backend_helpers_only" exit
+capture mata: mata drop tmo_scpc_backend_ready()
+capture mata: mata drop set_Wx_cluster()
+mata:
+real scalar tmo_scpc_backend_ready()
+{
+    external real scalar __tmo_scpc_backend_patch
+    return(__tmo_scpc_backend_patch==1)
+}
+
+void set_Wx_cluster(string scalar Vname, string scalar sel)
+{
+    external real scalar condflag
+    external real matrix Wfin, Wx
+    external real vector permfin
+    real vector r
+    real scalar i
+    string scalar cluster
+
+    cluster=st_global("e(clustvar)")
+    if(cluster=="" | cols(tokens(cluster))!=1) {
+        errprintf("tmo: conditional SCPC requires the current single cluster variable.\n")
+        _error(459)
+    }
+    condflag=1
+    r=J(rows(Wfin),1,0)
+    Wx=Wfin
+    for(i=1;i<=cols(Wfin);i++) {
+        r[permfin]=Wfin[.,i]
+        stata("capture drop scpc_r")
+        stata("quietly generate scpc_r=.")
+        stata("quietly replace scpc_r=0 if e(sample)")
+        st_store(.,"scpc_r",sel,r)
+        stata("capture drop scpc_rx")
+        stata("quietly gegen scpc_rx=total(scpc_r) if e(sample), by("+cluster+")")
+        stata("capture drop scpc_r")
+        if(i==1) {
+            stata("quietly generate scpc_r=scpc_rx*scpc_xs if e(sample)")
+        }
+        else {
+            stata("quietly replace scpc_rx=scpc_rx*scpc_xs")
+            stata("_estimates hold oreg, restore")
+            stata(Vname)
+            stata("quietly predict scpc_r, residuals")
+            stata("_estimates unhold oreg")
+        }
+        stata("capture drop scpc_rx")
+        stata("quietly hashsort "+cluster)
+        stata("quietly gegen scpc_rx=total(scpc_r*scpc_x) if e(sample), by("+cluster+")")
+        Wx[.,i]=st_data(.,"scpc_rx",sel)[permfin]
+    }
+    set_ccspc()
+}
+__tmo_scpc_backend_patch=1
 end

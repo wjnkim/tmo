@@ -8,7 +8,7 @@ d - Java (optional; the estimator falls back to Mata without it)
 d - geodist for legacy distance dyads only (ssc install geodist)
 d - compatible SCPC companion for scpc options only (see help tmo)
 d
-d Distribution-Date: 20261029
+d Distribution-Date: 20261030
 d
 d License: MIT (see LICENSE in the repository)
 d
